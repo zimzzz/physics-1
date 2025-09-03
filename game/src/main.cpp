@@ -8,7 +8,7 @@ int main()
     while (!WindowShouldClose())
     {
         BeginDrawing();
-        ClearBackground(DARKGRAY);
+        ClearBackground(WHITE);
         DrawText("Hello world!", 10, 10, 20, LIGHTGRAY);
         EndDrawing();
     }
