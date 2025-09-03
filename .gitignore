@@ -1,3 +1,4 @@
 .vs
 /bin
-*.obj
+/game/obj
+/raylib-5.5/obj
