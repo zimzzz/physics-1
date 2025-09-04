@@ -1,3 +1,8 @@
+/*
+This project uses the Raylib framework to provide us functionality for math, graphics, GUI, input etc.
+See documentation here: https://www.raylib.com/, and examples here: https://www.raylib.com/examples.html
+*/
+
 #include "raylib.h"
 #include "raymath.h"
 #define RAYGUI_IMPLEMENTATION
