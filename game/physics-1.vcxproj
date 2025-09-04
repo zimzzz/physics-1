@@ -296,6 +296,7 @@
   </ItemDefinitionGroup>
   <ItemGroup>
     <ClInclude Include="include\game.h" />
+    <ClInclude Include="include\raygui.h" />
   </ItemGroup>
   <ItemGroup>
     <ClCompile Include="src\main.cpp" />
