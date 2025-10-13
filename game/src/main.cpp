@@ -25,42 +25,108 @@ public:
     Vector2 position = {0 , 0 };
     Vector2 velocity = { 0, 0 };
     float mass = 1;
-
-    float radius = 15;
+    
     std::string name = "object";
-
-    void draw()
+    Color color = GREEN;
+    virtual void draw()
     {
-        DrawCircle(position.x, position.y, radius, RED);
-        DrawText(name.c_str(), GetScreenHeight() - 140, 10, 30, LIGHTGRAY);
-        DrawLineEx(position, (position + velocity), 1, RED);
+        DrawCircle(position.x, position.y, 2, color);
+        //DrawText(name.c_str(), position.x, position.y, 12, LIGHTGRAY);
+        // DrawLineEx(position, (position + velocity), 1, RED);
     }
 };
+
+class PhysicsCircle : public PhysicsObject
+{
+public:
+    float radius;
+
+    void draw() override
+    {
+        DrawCircle(position.x, position.y, radius, color);
+        DrawText(name.c_str(), position.x, position.y, radius * 2, LIGHTGRAY);
+        DrawLineEx(position, (position + velocity), 1, color);
+    }
+};
+
+static bool CircleCircleOverlap(PhysicsCircle* circleA, PhysicsCircle* circleB)
+{
+    Vector2 displacementFromAToB = circleB->position - circleA->position;
+    float distance = Vector2Length(displacementFromAToB);
+    float sumOfRadius = circleA->radius + circleB->radius;
+    if (sumOfRadius > distance)
+    {
+        return true;
+    }
+    else
+        return false;
+}
 
 class PhysicsWorld
 {
 private:
     unsigned int objectCount = 0;
 public:
-    std::vector<PhysicsObject> objects;
+    std::vector<PhysicsObject*> objects;
     Vector2 accelerationGravity = { 0,9 };
 
-   void add(PhysicsObject newObject)
-   {
-       newObject.name = std::to_string(objectCount);
-       objects.push_back(newObject);
-       objectCount++;
-   }
+    void add(PhysicsObject* newObject)
+    {
+        newObject->name = std::to_string(objectCount);
+        objects.push_back(newObject);
+        objectCount++;
+    }
 
-   void update()
-   {
-       for (int i = 0; i < objects.size(); i++)
-       {
-           objects[i].position = objects[i].position + objects[i].velocity * dt;
-           objects[i].velocity = objects[i].velocity + accelerationGravity * dt;
-       }
-   }
+    void update()
+    {
+        for (int i = 0; i < objects.size(); i++)
+        {
+            PhysicsObject* object = objects[i];
+            object->position = object->position + object->velocity * dt;
+            object->velocity = object->velocity + accelerationGravity * dt;
+        }
+
+        checkCollisions();
+    }
+
+    void checkCollisions()
+    {
+        for (int i = 0; i < objects.size(); i++)
+        {
+            PhysicsObject* object = objects[i];
+            PhysicsCircle* circle = (PhysicsCircle*)object;
+            circle->color = GREEN;
+        }
+
+        for (int i = 0; i < objects.size();i++)
+        {
+            for (int j = i + 1 ; j < objects.size();j++)
+            {
+                if (i == j) continue;
+                PhysicsObject* objectPointerA = objects[i];
+                PhysicsCircle* circlePointerA = (PhysicsCircle*)objectPointerA;
+
+                PhysicsObject* objectPointerB = objects[j];
+                PhysicsCircle* circlePointerB = (PhysicsCircle*)objectPointerB;
+
+
+                if (CircleCircleOverlap(circlePointerA, circlePointerB))
+                {
+                    circlePointerA->color = RED;
+                    circlePointerB->color = RED;
+                }
+                else
+                {
+                    circlePointerA->color = GREEN;
+                    circlePointerB->color = GREEN;
+                }
+            }
+
+        }
+    }
 };
+
+
 
 float speed = 100;
 float angle = 0;
@@ -82,15 +148,15 @@ void update()
     //velocity += accelerationGravity * dt;
     if (IsKeyPressed(KEY_SPACE))
     {
-        PhysicsObject newBird;
-        newBird.position = { 100, (float)GetScreenHeight() - launchPosition };
-        newBird.velocity = { speed * (float)cos(angle * DEG2RAD), speed * (float)sin(angle * DEG2RAD) };
-        newBird.radius = 15;
+        PhysicsCircle* newBird = new PhysicsCircle();
+        newBird->position = { 100, (float)GetScreenHeight() - launchPosition };
+        newBird->velocity = { speed * (float)cos(angle * DEG2RAD), speed * (float)sin(angle * DEG2RAD) };
+        newBird->radius = 15;
         world.add(newBird);
     }
    //y = y + (cos(time * frequency)) * frequency * amplitude * dt;
    // x = x + (-sin(time * frequency)) * frequency * amplitude * dt;
-}
+}   
 
 void draw()
 {
@@ -112,7 +178,7 @@ void draw()
 
             for (int i = 0;i < world.objects.size();i++)
             {
-                world.objects[i].draw();
+                world.objects[i]->draw();
             }
             //DrawCircle(position.x, position.y, 15, RED);
             
