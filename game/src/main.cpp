@@ -14,6 +14,9 @@ See documentation here: https://www.raylib.com/, and examples here: https://www.
 const unsigned int TARGET_FPS = 50;
 float dt = 60;
 float time = 0;
+
+float coefficientOfFriction = 0.5f;
+
 float x = 500;
 float y = 500;
 float frequency = 1;
@@ -32,6 +35,7 @@ public:
     Vector2 position = {0 , 0 };
     Vector2 velocity = { 0, 0 };
     float mass = 1;
+    Vector2 netForce = { 0,0 };
     
     std::string name = "object";
     Color color = GREEN;
@@ -96,73 +100,10 @@ public:
     }
 };
 
-bool CircleCircleOverlap(PhysicsCircle* circleA, PhysicsCircle* circleB)
-{
-    Vector2 displacementFromAToB = circleB->position - circleA->position;
-    float distance = Vector2Length(displacementFromAToB);
-    float sumOfRadius = circleA->radius + circleB->radius;
 
-    if (sumOfRadius > distance)
-    {
-        return true;
-    }
-    else
-        return false;
-}
 
-bool CircleCircleCollision(PhysicsCircle* circleA, PhysicsCircle* circleB)
-{
-    Vector2 displacementFromAToB = circleB->position - circleA->position;
-    float distance = Vector2Length(displacementFromAToB);
-    float sumOfRadius = circleA->radius + circleB->radius;
-    float overlap = sumOfRadius - distance;
-    if (overlap > 0)
-    {
-        Vector2 normalAtoB = displacementFromAToB / distance;
-        Vector2 mtv = normalAtoB * overlap;
-        circleA->position -= mtv * 0.5f;
-        circleB->position += mtv * 0.5f;
-        return true;
-    }
-    else
-        return false;
-}
-
-bool CircleHalfspaceOverlap(PhysicsCircle* circle, PhysicsHalfspace* halfspace)
-{
-    Vector2 displacementToCircle = circle->position - halfspace->position;
-    float dot = Vector2DotProduct(displacementToCircle, halfspace->getNormal());
-    Vector2 vectorProjection = halfspace->getNormal() * dot;
-
-    bool isOverlapping = dot <= circle->radius && dot >= -circle->radius;
-    DrawLineEx(circle->position, circle->position - vectorProjection, 1, GRAY);
-    Vector2 midpoint = circle->position - vectorProjection * 0.5f;
-    DrawText(TextFormat("D: %6.0f", dot), midpoint.x, midpoint.y, 30, GRAY);
-
-    return isOverlapping;
-}
-
-bool CircleHalfspaceCollision(PhysicsCircle* circle, PhysicsHalfspace* halfspace)
-{
-    Vector2 displacementToCircle = circle->position - halfspace->position;
-    float dot = Vector2DotProduct(displacementToCircle, halfspace->getNormal());
-    Vector2 vectorProjection = halfspace->getNormal() * dot;
-    float overlap = circle->radius - dot;
-    if (overlap > 0)
-    {
-        Vector2 mtv = halfspace->getNormal() * overlap;
-        circle->position += mtv;
-        return true;
-    }
-    else
-    {
-        return false;
-    }
-    /*bool isOverlapping = dot <= circle->radius && dot >= -circle->radius;*/
-    /*DrawLineEx(circle->position, circle->position - vectorProjection, 1, GRAY);
-    Vector2 midpoint = circle->position - vectorProjection * 0.5f;
-    DrawText(TextFormat("D: %6.0f", dot), midpoint.x, midpoint.y, 30, GRAY);*/
-}
+bool CircleCircleCollision(PhysicsCircle* circleA, PhysicsCircle* circleB);
+bool CircleHalfspaceCollision(PhysicsCircle* circle, PhysicsHalfspace* halfspace);
 
 class PhysicsWorld
 {
@@ -179,7 +120,30 @@ public:
         objectCount++;
     }
 
-    void update()
+    void ResetNetForce()
+    {
+        for (int i = 0; i < objects.size(); i++)
+        {
+            objects[i]->netForce = { 0,0 };
+        }
+    }
+
+    void AddGravityForce()
+    {
+        for (int i = 0; i < objects.size(); i++)
+        {
+            PhysicsObject* object = objects[i];
+
+            if (object->isStatic) continue;
+
+            Vector2 FGravity = accelerationGravity * object->mass;
+            object->netForce += FGravity;
+
+            DrawLineEx(object->position, object->position + FGravity, 1, PURPLE);
+        }
+    }
+
+    void ApplyKinematics()
     {
         for (int i = 0; i < objects.size(); i++)
         {
@@ -188,10 +152,19 @@ public:
             if (object->isStatic) continue;
 
             object->position = object->position + object->velocity * dt;
-            object->velocity = object->velocity + accelerationGravity * dt;
-        }
+            Vector2 acceleration = object->netForce / object->mass;
+            object->velocity = object->velocity + acceleration * dt;
 
+            DrawLineEx(object->position, object->position + object->netForce, 4, GRAY);
+        }
+    }
+
+    void update()
+    {
+        ResetNetForce();
+        AddGravityForce();
         checkCollisions();
+        ApplyKinematics();
     }
 
     void checkCollisions()
@@ -253,6 +226,98 @@ PhysicsWorld world;
 PhysicsHalfspace halfspace;
 PhysicsHalfspace halfspace2;
 PhysicsHalfspace halfspace3;
+
+bool CircleCircleOverlap(PhysicsCircle* circleA, PhysicsCircle* circleB)
+{
+    Vector2 displacementFromAToB = circleB->position - circleA->position;
+    float distance = Vector2Length(displacementFromAToB);
+    float sumOfRadius = circleA->radius + circleB->radius;
+
+    if (sumOfRadius > distance)
+    {
+        return true;
+    }
+    else
+        return false;
+}
+
+bool CircleCircleCollision(PhysicsCircle* circleA, PhysicsCircle* circleB)
+{
+    Vector2 displacementFromAToB = circleB->position - circleA->position;
+    float distance = Vector2Length(displacementFromAToB);
+    float sumOfRadius = circleA->radius + circleB->radius;
+    float overlap = sumOfRadius - distance;
+    if (overlap > 0)
+    {
+        Vector2 normalAtoB = displacementFromAToB / distance;
+        Vector2 mtv = normalAtoB * overlap;
+        circleA->position -= mtv * 0.5f;
+        circleB->position += mtv * 0.5f;
+        return true;
+    }
+    else
+        return false;
+}
+
+bool CircleHalfspaceOverlap(PhysicsCircle* circle, PhysicsHalfspace* halfspace)
+{
+    Vector2 displacementToCircle = circle->position - halfspace->position;
+    float dot = Vector2DotProduct(displacementToCircle, halfspace->getNormal());
+    Vector2 vectorProjection = halfspace->getNormal() * dot;
+
+    bool isOverlapping = dot <= circle->radius && dot >= -circle->radius;
+    DrawLineEx(circle->position, circle->position - vectorProjection, 1, GRAY);
+    Vector2 midpoint = circle->position - vectorProjection * 0.5f;
+    DrawText(TextFormat("D: %6.0f", dot), midpoint.x, midpoint.y, 30, GRAY);
+
+    return isOverlapping;
+}
+
+bool CircleHalfspaceCollision(PhysicsCircle* circle, PhysicsHalfspace* halfspace)
+{
+    Vector2 displacementToCircle = circle->position - halfspace->position;
+    float dot = Vector2DotProduct(displacementToCircle, halfspace->getNormal());
+    Vector2 vectorProjection = halfspace->getNormal() * dot;
+    float overlap = circle->radius - dot;
+    if (overlap > 0)
+    {
+        Vector2 mtv = halfspace->getNormal() * overlap;
+        circle->position += mtv;
+
+        Vector2 Fgravity = world.accelerationGravity * circle->mass;
+        Vector2 FgPerp = halfspace->getNormal() * Vector2DotProduct(Fgravity, halfspace->getNormal());
+        Vector2 Fnormal = FgPerp * -1;
+        circle->netForce += Fnormal;
+        DrawLineEx(circle->position, circle->position + Fnormal, 2, GREEN);
+
+        Vector2 normalVelocity = halfspace->getNormal() * Vector2DotProduct(circle->velocity, halfspace->getNormal());
+        Vector2 frictionVelocity = circle->velocity - normalVelocity;
+
+        float frictionSpeed = Vector2Length(frictionVelocity);
+
+        if (frictionSpeed > 0.0001f)
+        {
+            Vector2 frictionDirection = Vector2Normalize(frictionVelocity) * -1;
+
+            float frictionMagnitude = coefficientOfFriction * Vector2Length(Fnormal);
+            Vector2 Ffriction = frictionDirection * frictionMagnitude;
+
+            circle->netForce += Ffriction;
+            DrawLineEx(circle->position, circle->position + Ffriction, 2, ORANGE);
+        }
+
+        return true;
+    }
+    else
+    {
+        return false;
+    }
+    /*bool isOverlapping = dot <= circle->radius && dot >= -circle->radius;*/
+    /*DrawLineEx(circle->position, circle->position - vectorProjection, 1, GRAY);
+    Vector2 midpoint = circle->position - vectorProjection * 0.5f;
+    DrawText(TextFormat("D: %6.0f", dot), midpoint.x, midpoint.y, 30, GRAY);*/
+}
+
 //Vector2 position = {500, 500};
 //Vector2 velocity = { 0, 0 };
 
@@ -293,6 +358,7 @@ void draw()
             GuiSliderBar(Rectangle{ 410, 200, 300, 30 }, "", TextFormat("HalfSpace Y: %0.f",halfspace.position.y), &halfspace.position.y, 0, GetScreenHeight());
             float halfspaceRotation = halfspace.getRotation();
             GuiSliderBar(Rectangle{ 810, 200, 300, 30 }, "", TextFormat("Rotation: %0.f", halfspace.getRotation()), &halfspaceRotation, -360, 360);
+            GuiSliderBar(Rectangle{ 80, 240, 300, 30 }, "", TextFormat("Friction: %0.2f", coefficientOfFriction), &coefficientOfFriction, 0, 1);
 
             halfspace.setRotationDegrees(halfspaceRotation);
             
@@ -312,14 +378,18 @@ void draw()
             //DrawText(TextFormat("T: %.2f", time), GetScreenWidth() - 180, 10, 30, LIGHTGRAY);
             //DrawCircle(x, y, 70, RED);
 
-            /*Vector2 location = { 300,900 };
+           /* Vector2 location = { 500,500 };
             DrawCircleLines(location.x, location.y, 100, WHITE);
             float mass = 8;
             Vector2 Fgravity = world.accelerationGravity * mass;
             DrawLine(location.x, location.y, location.x + Fgravity.x, location.y + Fgravity.y, PURPLE);
             Vector2 FgPerp = halfspace.getNormal() * Vector2DotProduct(Fgravity, halfspace.getNormal());
             Vector2 Fnormal = FgPerp * -1;
-            DrawLine(location.x, location.y, location.x + Fnormal.x, location.y + Fnormal.y, GREEN);*/
+            DrawLine(location.x, location.y, location.x + Fnormal.x, location.y + Fnormal.y, GREEN);
+            Vector2 FgPara = Fgravity - FgPerp;
+            Vector2 FgFriction = FgPara * -1;
+            DrawLine(location.x, location.y, location.x + FgFriction.x, location.y + FgFriction.y, ORANGE);*/
+
 
         EndDrawing();
 
@@ -330,19 +400,20 @@ int main()
     InitWindow(InitialWidth, InitialHeight, "Johnny Zimmer: 101533005 - GAME2005");
     SetTargetFPS(TARGET_FPS);
     halfspace.isStatic = true;
-    halfspace.position = { 700 ,800 };
-    halfspace2.setRotationDegrees(-45);
+    halfspace.position = { 500 ,600 };
+    world.add(&halfspace);
+    /*halfspace2.setRotationDegrees(-45);*/
 
-    halfspace2.isStatic = true;
+    /*halfspace2.isStatic = true;
     halfspace2.position = { 500,800 };
     halfspace2.setRotationDegrees(45);
 
     halfspace3.isStatic = true;
-    halfspace3.position = { 800,700 };
+    halfspace3.position = { 800,700 };*/
 
-    world.add(&halfspace);
-    world.add(&halfspace2);
-    world.add(&halfspace3);
+    
+    /*world.add(&halfspace2);
+    world.add(&halfspace3);*/
     while (!WindowShouldClose())
     {
         update();
