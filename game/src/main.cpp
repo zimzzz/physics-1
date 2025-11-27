@@ -17,6 +17,7 @@ float time = 0;
 
 float coefficientOfFriction = 0.5f;
 float worldmass = 1.0f;
+float restitution = 0.9f;
 
 float x = 500;
 float y = 500;
@@ -37,7 +38,8 @@ public:
     Vector2 velocity = { 0, 0 };
     float mass = 1;
     Vector2 netForce = { 0,0 };
-    
+    float bounciness = 0.8f;
+
     std::string name = "object";
     Color color = GREEN;
     virtual void draw()
@@ -248,12 +250,25 @@ bool CircleCircleCollision(PhysicsCircle* circleA, PhysicsCircle* circleB)
     float distance = Vector2Length(displacementFromAToB);
     float sumOfRadius = circleA->radius + circleB->radius;
     float overlap = sumOfRadius - distance;
-    if (overlap > 0)
+    if (overlap >= 0)
     {
-        Vector2 normalAtoB = displacementFromAToB / distance;
-        Vector2 mtv = normalAtoB * overlap;
+        Vector2 normal = displacementFromAToB / distance;
+        Vector2 mtv = normal * overlap;
         circleA->position -= mtv * 0.5f;
         circleB->position += mtv * 0.5f;
+
+        Vector2 velocityBRelativeToA = circleB->velocity - circleA->velocity;
+        float closingVelocity = Vector2DotProduct(velocityBRelativeToA, normal);
+        if (closingVelocity >= 0)  return true;
+        
+        float restitution = circleA->bounciness * circleB->bounciness;
+        float totalMass = circleA->mass + circleB->mass;
+        float impulseMagnitude = ((1.0f + restitution)*closingVelocity*circleA->mass*circleB->mass) / totalMass;
+        Vector2 impulseB = normal * -impulseMagnitude;
+        Vector2 impulseA = normal * impulseMagnitude;
+
+        circleA->velocity += impulseA / circleA->mass;
+        circleB->velocity += impulseB / circleB->mass;
         return true;
     }
     else
@@ -290,7 +305,7 @@ bool CircleHalfspaceCollision(PhysicsCircle* circle, PhysicsHalfspace* halfspace
         Vector2 Fnormal = FgPerp * -1;
         circle->netForce += Fnormal;
         DrawLineEx(circle->position, circle->position + Fnormal, 2, GREEN);
-
+        //Friction
         Vector2 normalVelocity = halfspace->getNormal() * Vector2DotProduct(circle->velocity, halfspace->getNormal());
         Vector2 frictionVelocity = circle->velocity - normalVelocity;
         float frictionSpeed = Vector2Length(frictionVelocity);
@@ -302,6 +317,14 @@ bool CircleHalfspaceCollision(PhysicsCircle* circle, PhysicsHalfspace* halfspace
             circle->netForce += Ffriction;
             DrawLineEx(circle->position, circle->position + Ffriction, 2, ORANGE);
         }
+        //Bouncing
+        //Vector2 velocityBRelativeToA = circleB->velocity - circleA->velocity;
+        float closingVelocity = Vector2DotProduct(circle->velocity, halfspace->getNormal());
+        if (closingVelocity >= 0)  return true;
+
+        float restitution = circle->bounciness * halfspace->bounciness;
+        circle->velocity += halfspace->getNormal() * closingVelocity * -(1.0f + restitution);
+
 
         return true;
     }
@@ -334,10 +357,9 @@ void update()
         newBird->velocity = { speed * (float)cos(angle * DEG2RAD), speed * (float)sin(angle * DEG2RAD) };
         newBird->radius = 15;
         newBird->mass = worldmass;
+        newBird->bounciness = restitution;
         world.add(newBird);
     }
-   //y = y + (cos(time * frequency)) * frequency * amplitude * dt;
-   // x = x + (-sin(time * frequency)) * frequency * amplitude * dt;
 }   
 
 void draw()
@@ -356,8 +378,11 @@ void draw()
             GuiSliderBar(Rectangle{ 410, 200, 300, 30 }, "", TextFormat("HalfSpace Y: %0.f",halfspace.position.y), &halfspace.position.y, 0, GetScreenHeight());
             float halfspaceRotation = halfspace.getRotation();
             GuiSliderBar(Rectangle{ 810, 200, 300, 30 }, "", TextFormat("Rotation: %0.f", halfspace.getRotation()), &halfspaceRotation, -360, 360);
-            GuiSliderBar(Rectangle{ 80, 240, 300, 30 }, "", TextFormat("Friction: %0.2f", coefficientOfFriction), &coefficientOfFriction, 0, 1);
-            GuiSliderBar(Rectangle{ 470, 240, 300, 30 }, "", TextFormat("World Mass: %0.2f", worldmass), &worldmass, 0, 10);
+            GuiSliderBar(Rectangle{ 10, 240, 300, 30 }, "", TextFormat("Friction: %0.2f", coefficientOfFriction), &coefficientOfFriction, 0, 1);
+            GuiSliderBar(Rectangle{ 410, 240, 300, 30 }, "", TextFormat("World Mass: %0.2f", worldmass), &worldmass, 0, 10);
+            GuiSliderBar(Rectangle{ 810, 240, 300, 30 }, "", TextFormat("Resitution: %0.2f", restitution), &restitution, 0, 1);
+
+
 
             halfspace.setRotationDegrees(halfspaceRotation);
             
@@ -401,17 +426,17 @@ int main()
     halfspace.isStatic = true;
     halfspace.position = { 500 ,600 };
     world.add(&halfspace);
-    /*halfspace2.setRotationDegrees(-45);*/
+    halfspace2.setRotationDegrees(-45);
 
     /*halfspace2.isStatic = true;
     halfspace2.position = { 500,800 };
     halfspace2.setRotationDegrees(45);
 
     halfspace3.isStatic = true;
-    halfspace3.position = { 800,700 };*/
+    halfspace3.position = { 800,700 };
 
     
-    /*world.add(&halfspace2);
+    world.add(&halfspace2);
     world.add(&halfspace3);*/
     while (!WindowShouldClose())
     {
