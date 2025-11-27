@@ -16,6 +16,7 @@ float dt = 60;
 float time = 0;
 
 float coefficientOfFriction = 0.5f;
+float worldmass = 1.0f;
 
 float x = 500;
 float y = 500;
@@ -292,16 +293,12 @@ bool CircleHalfspaceCollision(PhysicsCircle* circle, PhysicsHalfspace* halfspace
 
         Vector2 normalVelocity = halfspace->getNormal() * Vector2DotProduct(circle->velocity, halfspace->getNormal());
         Vector2 frictionVelocity = circle->velocity - normalVelocity;
-
         float frictionSpeed = Vector2Length(frictionVelocity);
-
         if (frictionSpeed > 0.0001f)
         {
             Vector2 frictionDirection = Vector2Normalize(frictionVelocity) * -1;
-
             float frictionMagnitude = coefficientOfFriction * Vector2Length(Fnormal);
             Vector2 Ffriction = frictionDirection * frictionMagnitude;
-
             circle->netForce += Ffriction;
             DrawLineEx(circle->position, circle->position + Ffriction, 2, ORANGE);
         }
@@ -336,6 +333,7 @@ void update()
         newBird->position = { 100, (float)GetScreenHeight() - launchPosition };
         newBird->velocity = { speed * (float)cos(angle * DEG2RAD), speed * (float)sin(angle * DEG2RAD) };
         newBird->radius = 15;
+        newBird->mass = worldmass;
         world.add(newBird);
     }
    //y = y + (cos(time * frequency)) * frequency * amplitude * dt;
@@ -359,6 +357,7 @@ void draw()
             float halfspaceRotation = halfspace.getRotation();
             GuiSliderBar(Rectangle{ 810, 200, 300, 30 }, "", TextFormat("Rotation: %0.f", halfspace.getRotation()), &halfspaceRotation, -360, 360);
             GuiSliderBar(Rectangle{ 80, 240, 300, 30 }, "", TextFormat("Friction: %0.2f", coefficientOfFriction), &coefficientOfFriction, 0, 1);
+            GuiSliderBar(Rectangle{ 470, 240, 300, 30 }, "", TextFormat("World Mass: %0.2f", worldmass), &worldmass, 0, 10);
 
             halfspace.setRotationDegrees(halfspaceRotation);
             
